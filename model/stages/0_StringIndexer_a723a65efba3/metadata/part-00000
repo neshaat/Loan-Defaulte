@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.StringIndexerModel","timestamp":1715448013027,"sparkVersion":"3.5.1","uid":"StringIndexer_a723a65efba3","paramMap":{"outputCol":"FLAG_OWN_CAR_index","inputCol":"FLAG_OWN_CAR"},"defaultParamMap":{"outputCol":"StringIndexer_a723a65efba3__output","stringOrderType":"frequencyDesc","handleInvalid":"error"}}
