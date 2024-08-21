@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loan Defaulter Prediction</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Loan Defaulter Prediction</h1>
+        <form id="predictionForm">
+            <label for="amt_income_total">Income Total:</label>
+            <input type="number" step="0.01" id="amt_income_total" name="amt_income_total" required>
+
+            <label for="amt_credit">Credit Amount:</label>
+            <input type="number" step="0.01" id="amt_credit" name="amt_credit" required>
+
+            <label for="amt_annuity">Annuity Amount:</label>
+            <input type="number" step="0.01" id="amt_annuity" name="amt_annuity" required>
+
+            <label for="days_employed">Days Employed:</label>
+            <input type="number" id="days_employed" name="days_employed" required>
+
+            <label for="days_registration">Days Registration:</label>
+            <input type="number" id="days_registration" name="days_registration" required>
+
+            <label for="flag_own_car">Owns a Car:</label>
+            <select id="flag_own_car" name="flag_own_car" required>
+                <option value="Y">Yes</option>
+                <option value="N">No</option>
+            </select>
+
+            <label for="flag_own_realty">Owns Realty:</label>
+            <select id="flag_own_realty" name="flag_own_realty" required>
+                <option value="Y">Yes</option>
+                <option value="N">No</option>
+            </select>
+
+            <button type="submit">Predict</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('predictionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('result').textContent = "Error: " + data.error;
+                } else {
+                    document.getElementById('result').textContent = 
+                        `Prediction: ${data.prediction}, Probability: ${data.probability}`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('result').textContent = "Error: " + error;
+            });
+        });
+    </script>
+</body>
+</html>
