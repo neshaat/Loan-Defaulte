@@ -1,50 +1,54 @@
 from pyspark.sql import SparkSession
-from pyspark.ml.tuning import CrossValidatorModel
-from pyspark.ml.feature import VectorAssembler, StringIndexer
+from pyspark.ml import PipelineModel
+from pyspark.ml.feature import StringIndexer, VectorAssembler
+from pyspark.sql.functions import col
 
 
 def load_model():
-    # Initialize SparkSession
     spark = SparkSession.builder \
         .appName("LoanDefaulterPrediction") \
         .getOrCreate()
 
-    model = CrossValidatorModel.load("./model")
-
+    model_path = "./model"
+    model = PipelineModel.load(model_path)
     return spark, model
 
 
-def preprocess_data(spark):
-    synthetic_test_data = spark.createDataFrame([
-        (202500.0, 406597.5, 24700.5, -637, -3648.0, "Y", "Y"),
-        (270000.0, 1293502.5, 35698.5, -1188, -1186.0, "N", "N"),
-        (90500.0, 135000.0, 6750.0, -225, -4260.0, "Y", "Y")
-    ], ["AMT_INCOME_TOTAL", "AMT_CREDIT", "AMT_ANNUITY", "DAYS_EMPLOYED", "DAYS_REGISTRATION", "FLAG_OWN_CAR",
-        "FLAG_OWN_REALTY"])
+def add_string_indexers(df, indexers):
+    for input_col, output_col in indexers.items():
+        if output_col not in df.columns:
+            indexer = StringIndexer(inputCol=input_col, outputCol=output_col).fit(df)
+            df = indexer.transform(df)
+        else:
+            print(f"Column {output_col} already exists. Skipping StringIndexer for {input_col}.")
+    return df
 
-    indexers = [
-        StringIndexer(inputCol="FLAG_OWN_CAR", outputCol="FLAG_OWN_CAR_index"),
-        StringIndexer(inputCol="FLAG_OWN_REALTY", outputCol="FLAG_OWN_REALTY_index")
-    ]
 
-    for indexer in indexers:
-        synthetic_test_data = indexer.fit(synthetic_test_data).transform(synthetic_test_data)
+def preprocess_data(spark, data):
+    columns = ['AMT_INCOME_TOTAL', 'AMT_CREDIT', 'AMT_ANNUITY', 'DAYS_EMPLOYED', 'DAYS_REGISTRATION', 'FLAG_OWN_CAR',
+               'FLAG_OWN_REALTY']
+    df = spark.createDataFrame([data], columns)
+    indexers = {
+        'FLAG_OWN_CAR': 'FLAG_OWN_CAR_index',
+        'FLAG_OWN_REALTY': 'FLAG_OWN_REALTY_index'
+    }
+    df = add_string_indexers(df, indexers)
+    feature_cols = ['AMT_INCOME_TOTAL', 'AMT_CREDIT', 'AMT_ANNUITY', 'DAYS_EMPLOYED', 'DAYS_REGISTRATION',
+                    'FLAG_OWN_CAR_index', 'FLAG_OWN_REALTY_index']
 
-    feature_cols = ['AMT_INCOME_TOTAL', 'AMT_CREDIT', 'AMT_ANNUITY', 'DAYS_EMPLOYED',
-                    'DAYS_REGISTRATION', 'FLAG_OWN_CAR_index', 'FLAG_OWN_REALTY_index']
+    for col_name in feature_cols:
+        if col_name not in df.columns:
+            raise ValueError(f"Missing feature column: {col_name}")
     assembler = VectorAssembler(inputCols=feature_cols, outputCol='features')
-    data_with_features_test = assembler.transform(synthetic_test_data)
-
-    return data_with_features_test
-
-
-def predict_loan_default(spark, model):
-    data_with_features_test = preprocess_data(spark)
-    predictions_test = model.transform(data_with_features_test)
-    predictions_test.select("prediction").show()
+    df = assembler.transform(df)
+    return df
 
 
-if __name__ == "__main__":
-    spark, model = load_model()
-
-    predict_loan_default(spark, model)
+def predict_loan_default(spark, model, test_data):
+    """
+    Predicts loan default using the Spark model.
+    """
+    test_df = preprocess_data(spark, test_data)
+    predictions = model.transform(test_df)
+    result = predictions.select("prediction").collect()[0][0]
+    return {"prediction": result}
